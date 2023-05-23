@@ -1117,6 +1117,7 @@ class TestParameters(QiskitTestCase):
         qc.p(numpy.cos(phi), 0)
         qc.p(numpy.sin(phi), 0)
         qc.p(numpy.tan(phi), 0)
+        qc.p(numpy.power(phi**2, 0.5), 0)
         qc.rz(numpy.arccos(theta), 1)
         qc.rz(numpy.arctan(theta), 1)
         qc.rz(numpy.arcsin(theta), 1)
@@ -1128,6 +1129,7 @@ class TestParameters(QiskitTestCase):
         qc_ref.p(-1, 0)
         qc_ref.p(0, 0)
         qc_ref.p(0, 0)
+        qc_ref.p(pi, 0)
         qc_ref.rz(0, 1)
         qc_ref.rz(pi / 4, 1)
         qc_ref.rz(pi / 2, 1)
@@ -1139,9 +1141,9 @@ class TestParameters(QiskitTestCase):
         after we apply universal functions."""
         from math import pi
 
-        theta = ParameterVector("theta", length=7)
+        theta = ParameterVector("theta", length=8)
 
-        qc = QuantumCircuit(7)
+        qc = QuantumCircuit(8)
         qc.rx(numpy.abs(theta[0]), 0)
         qc.rx(numpy.cos(theta[1]), 1)
         qc.rx(numpy.sin(theta[2]), 2)
@@ -1149,6 +1151,7 @@ class TestParameters(QiskitTestCase):
         qc.rx(numpy.arccos(theta[4]), 4)
         qc.rx(numpy.arctan(theta[5]), 5)
         qc.rx(numpy.arcsin(theta[6]), 6)
+        qc.rx(numpy.power(theta[7], 0.5), 7)
 
         # transpile to different basis
         transpiled = transpile(qc, basis_gates=["rz", "sx", "x", "cx"], optimization_level=0)
@@ -1156,9 +1159,9 @@ class TestParameters(QiskitTestCase):
         for x in theta:
             self.assertIn(x, transpiled.parameters)
 
-        bound = transpiled.bind_parameters({theta: [-1, pi, pi, pi, 1, 1, 1]})
+        bound = transpiled.bind_parameters({theta: [-1, pi, pi, pi, 1, 1, 1, pi**2]})
 
-        expected = QuantumCircuit(7)
+        expected = QuantumCircuit(8)
         expected.rx(1.0, 0)
         expected.rx(-1.0, 1)
         expected.rx(0.0, 2)
@@ -1166,6 +1169,7 @@ class TestParameters(QiskitTestCase):
         expected.rx(0.0, 4)
         expected.rx(pi / 4, 5)
         expected.rx(pi / 2, 6)
+        expected.rx(pi, 7)
         expected = transpile(expected, basis_gates=["rz", "sx", "x", "cx"], optimization_level=0)
 
         self.assertEqual(expected, bound)
@@ -1257,6 +1261,32 @@ class TestParameterExpressions(QiskitTestCase):
         self.assertEqual(abs(x), abs(-x))
         self.assertEqual(abs(x) * abs(y), abs(x * y))
         self.assertEqual(abs(x) / abs(y), abs(x / y))
+
+    def test_pow_function_when_bound(self):
+        """Verify expression can be used with
+        pow functions when bound."""
+
+        x = Parameter("x")
+        xb_1 = x.bind({x: 4.0})
+        xb_2 = x.bind({x: 2.0})
+        xb_3 = x.bind({x: 3.0 + 4.0j})
+
+        self.assertEqual(pow(xb_1, 2.0), 16.0)
+        self.assertEqual(pow(xb_1, 0.5), 2.0)
+        self.assertEqual(pow(xb_1, -0.5), 0.5)
+        self.assertEqual(pow(2.0, xb_2), 4.0)
+        self.assertEqual(pow(0.5, xb_2), 0.25)
+        self.assertEqual(pow(-0.5, xb_2), 0.25)
+        self.assertEqual(pow(xb_3, 2.0), -7.0 + 24.0j)
+
+    def test_pow_function_when_not_bound(self):
+        """Verify expression can be used with
+        pow functions when not bound."""
+
+        x = Parameter("x")
+
+        self.assertEqual(pow(x, 2), pow(-x, 2))
+        self.assertEqual(x*x*x, pow(x, 3))
 
     def test_cast_to_float_when_bound(self):
         """Verify expression can be cast to a float when fully bound."""

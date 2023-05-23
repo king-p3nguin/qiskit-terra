@@ -352,6 +352,12 @@ class ParameterExpression:
     def __rmul__(self, other):
         return self._apply_operation(operator.mul, other, reflected=True)
 
+    def __pow__(self, other):
+        return self._apply_operation(operator.pow, other)
+
+    def __rpow__(self, other):
+        return self._apply_operation(operator.pow, other, reflected=True)
+
     def __truediv__(self, other):
         if other == 0:
             raise ZeroDivisionError("Division of a ParameterExpression by zero.")
