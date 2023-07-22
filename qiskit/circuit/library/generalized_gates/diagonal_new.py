@@ -20,8 +20,11 @@ import sympy
 
 from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit.circuit.exceptions import CircuitError
+from qiskit.circuit.library.standard_gates.u3 import _generate_gray_code
 
 _EPS = 1e-10
+
+import pprint
 
 
 class DiagonalNew(QuantumCircuit):
@@ -87,44 +90,47 @@ class DiagonalNew(QuantumCircuit):
         num_qubits = np.log2(len(diag))
         if num_qubits < 1 or not num_qubits.is_integer():
             raise CircuitError("The number of diagonal entries is not a positive power of 2.")
-        if not np.allclose(np.abs(diag), 1, atol=_EPS):
-            raise CircuitError("A diagonal element does not have absolute value one.")
+        # if not np.allclose(np.abs(diag), 1, atol=_EPS):
+        #     raise CircuitError("A diagonal element does not have absolute value one.")
 
         num_qubits = int(num_qubits)
 
-        qc_d = [[] for _ in range(2**num_qubits)]
+        gate_list = [[] for _ in range(2**num_qubits)]
 
         # Since the diagonal is a unitary, all its entries have absolute value
         # one and the diagonal is fully specified by the phases of its entries.
         diag_phases = [cmath.phase(z) for z in diag]
-        angles_rz = np.array(sympy.fwht(diag_phases)).astype(float) / np.sqrt(2 ** (num_qubits - 2))
+        # angles_rz = np.array(sympy.fwht(diag_phases)).astype(float) / np.sqrt(2 ** (num_qubits - 2))
+        from qiskit.circuit import ParameterVector
 
-        for i in range(num_qubits - 1):
-            qc_d[0].append(["rz", -angles_rz[2**i], i])
+        angles_rz = ParameterVector("beta", 2 ** (num_qubits))
+
+        for i in range(1, num_qubits):
+            gate_list[0].append(["rz", -angles_rz[2 ** (num_qubits - i)], i - 1])
 
         cc_set = [0]
-        graycode = ["0", "1"]
+        gray_code = [0, 1]
         for p in range(2, num_qubits + 1):
             t = 2 ** (p - 1)
             cc_set[t // 2 - 1] = p - 1
             cc_set.extend(cc_set)
             if p < num_qubits:
-                qc_d[2**p].append(["cx", 0, p - 1])
+                gate_list[2**p].append(["cx", 0, p - 1])
                 for i in range(2, t + 1):
-                    j = int(graycode[i - 1] + "1" + "0" * (num_qubits - p), 2)
-                    qc_d[2**p + 2 * i - 3].append(["rz", -angles_rz[j - 1], p - 1])
-                    qc_d[2**p + 2 * i - 2].append(["cx", cc_set[i - 1] - 1, p - 1])
-                graycode = [x + "0" for x in graycode] + [x + "1" for x in graycode[::-1]]
+                    j = ((gray_code[i - 1] << 1) + 1) << (num_qubits - p)
+                    gate_list[2**p + 2 * i - 3].append(["rz", -angles_rz[j], p - 1])
+                    gate_list[2**p + 2 * i - 2].append(["cx", cc_set[i - 1] - 1, p - 1])
+                gray_code = [x << 1 for x in gray_code] + [(x << 1) + 1 for x in gray_code[::-1]]
 
-        for i in range(2 ** (num_qubits - 1)):
-            j = int(graycode[i] + "1", 2)
-            qc_d[2 * i - 2].append(["rz", -angles_rz[j], num_qubits - 1])
-            qc_d[2 * i - 1].append(["cx", cc_set[i] - 1, num_qubits - 1])
+        for i in range(1, 2 ** (num_qubits - 1) + 1):
+            j = (gray_code[i - 1] << 1) + 1
+            gate_list[2 * i - 2].append(["rz", -angles_rz[j], num_qubits - 1])
+            gate_list[2 * i - 1].append(["cx", cc_set[i - 1] - 1, num_qubits - 1])
 
         circuit = QuantumCircuit(num_qubits, name="Diagonal")
+        circuit.global_phase += diag_phases[0]
 
-        print(qc_d)
-        for seq in qc_d:
+        for seq in gate_list:
             for gate in seq:
                 if gate[0] == "rz":
                     circuit.rz(gate[1], gate[2])
