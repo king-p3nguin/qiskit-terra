@@ -100,10 +100,10 @@ class DiagonalNew(QuantumCircuit):
         # Since the diagonal is a unitary, all its entries have absolute value
         # one and the diagonal is fully specified by the phases of its entries.
         diag_phases = [cmath.phase(z) for z in diag]
-        # angles_rz = np.array(sympy.fwht(diag_phases)).astype(float) / np.sqrt(2 ** (num_qubits - 2))
-        from qiskit.circuit import ParameterVector
+        angles_rz = np.array(sympy.fwht(diag_phases)).astype(float) / np.sqrt(2 ** (num_qubits - 2))
+        # from qiskit.circuit import ParameterVector
 
-        angles_rz = ParameterVector("beta", 2 ** (num_qubits))
+        # angles_rz = ParameterVector("beta", 2 ** (num_qubits))
 
         for i in range(1, num_qubits):
             gate_list[0].append(["rz", -angles_rz[2 ** (num_qubits - i)], i - 1])
