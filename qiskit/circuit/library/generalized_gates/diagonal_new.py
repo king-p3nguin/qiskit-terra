@@ -108,10 +108,10 @@ class DiagonalNew(QuantumCircuit):
         if num_qubits == 1:
             gate_list[0].append(["rz", -angles_rz[1], 0])
 
-        for i in range(1, num_qubits):
-            gate_list[0].append(["rz", -angles_rz[2 ** (num_qubits - i)], i - 1])
+        else:
+            for i in range(1, num_qubits):
+                gate_list[0].append(["rz", -angles_rz[2 ** (num_qubits - i)], i - 1])
 
-        if num_qubits > 1:
             cc_set = [0]
             gray_code = [0, 1]
             for p in range(2, num_qubits + 1):
