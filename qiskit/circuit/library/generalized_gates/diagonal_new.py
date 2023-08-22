@@ -22,8 +22,6 @@ from qiskit.circuit.quantumcircuit import QuantumCircuit
 from qiskit.circuit.exceptions import CircuitError
 from qiskit.circuit.library.standard_gates.u3 import _generate_gray_code
 
-_EPS = 1e-10
-
 import pprint
 
 
@@ -90,8 +88,8 @@ class DiagonalNew(QuantumCircuit):
         num_qubits = np.log2(len(diag))
         if num_qubits < 1 or not num_qubits.is_integer():
             raise CircuitError("The number of diagonal entries is not a positive power of 2.")
-        # if not np.allclose(np.abs(diag), 1, atol=_EPS):
-        #     raise CircuitError("A diagonal element does not have absolute value one.")
+        if not np.allclose(np.abs(diag), 1):
+            raise CircuitError("A diagonal element does not have absolute value one.")
 
         num_qubits = int(num_qubits)
 
@@ -100,7 +98,13 @@ class DiagonalNew(QuantumCircuit):
         # Since the diagonal is a unitary, all its entries have absolute value
         # one and the diagonal is fully specified by the phases of its entries.
         diag_phases = [cmath.phase(z) for z in diag]
-        angles_rz = np.array(sympy.fwht(diag_phases)).astype(float) / np.sqrt(2 ** (num_qubits - 2))
+        # angles_rz = np.array(sympy.fwht(diag_phases)).astype(float) / np.sqrt(2 ** (num_qubits - 2))
+
+        fwht_matrix = Had = np.array([[1, 1], [1, -1]]) / np.sqrt(2)
+        for _ in range(num_qubits - 1):
+            fwht_matrix = np.kron(fwht_matrix, Had)
+
+        angles_rz = np.dot(fwht_matrix, diag_phases) / np.sqrt(2 ** (num_qubits - 2))
         # from qiskit.circuit import ParameterVector
 
         # angles_rz = ParameterVector("beta", 2 ** (num_qubits))
@@ -128,14 +132,14 @@ class DiagonalNew(QuantumCircuit):
             gate_list[2 * i - 1].append(["cx", cc_set[i - 1] - 1, num_qubits - 1])
 
         circuit = QuantumCircuit(num_qubits, name="Diagonal")
-        circuit.global_phase += diag_phases[0]
+        circuit.global_phase += angles_rz[0] / 2
 
         for seq in gate_list:
             for gate in seq:
                 if gate[0] == "rz":
-                    circuit.rz(gate[1], gate[2])
+                    circuit.rz(gate[1], num_qubits - 1 - gate[2])
                 elif gate[0] == "cx":
-                    circuit.cx(gate[1], gate[2])
+                    circuit.cx(num_qubits - 1 - gate[1], num_qubits - 1 - gate[2])
 
         super().__init__(num_qubits, name="Diagonal")
         self.append(circuit.to_gate(), self.qubits)
